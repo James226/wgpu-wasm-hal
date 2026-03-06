@@ -1,0 +1,4 @@
+github.com/gogpu/gputypes v0.2.0 h1:Quv3ekiU12zK4ZhBZsSZmalHYc+zj2gr9ZWRyzKgkKk=
+github.com/gogpu/gputypes v0.2.0/go.mod h1:cnXrDMwTpWTvJLW1Vreop3PcT6a2YP/i3s91rPaOavw=
+github.com/gogpu/wgpu v0.19.4 h1:D151enmyjZeOZ07Eq7ID0IPai/zZodhWnjqYq1bEAeY=
+github.com/gogpu/wgpu v0.19.4/go.mod h1:uQLpMDbLWPuS2H1vzcwxgiAFXlmscyvUL3T5tChbOJI=
