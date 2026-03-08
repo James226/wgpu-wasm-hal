@@ -4,6 +4,7 @@ package wasm
 
 import (
 	"sync/atomic"
+	"syscall/js"
 	"time"
 
 	"github.com/gogpu/wgpu/hal"
@@ -11,7 +12,9 @@ import (
 
 // Resource is a placeholder implementation for most HAL resource types.
 // It implements the hal.Resource interface with a no-op Destroy method.
-type Resource struct{}
+type Resource struct {
+	value js.Value
+}
 
 // Destroy is a no-op.
 func (r *Resource) Destroy() {}

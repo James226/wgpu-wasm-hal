@@ -3,13 +3,15 @@
 package wasm
 
 import (
-	"fmt"
+	"syscall/js"
 
 	"github.com/gogpu/wgpu/hal"
 )
 
 // Queue implements hal.Queue for the noop backend.
-type Queue struct{}
+type Queue struct {
+	queue js.Value
+}
 
 // Submit simulates command buffer submission.
 // If a fence is provided, it is signaled with the given value.
@@ -31,22 +33,27 @@ func (q *Queue) ReadBuffer(buffer hal.Buffer, offset uint64, data []byte) error 
 	return nil
 }
 
+func unpackArray[S ~[]E, E any](s S) []any {
+	r := make([]any, len(s))
+	for i, e := range s {
+		r[i] = e
+	}
+	return r
+}
+
 // WriteBuffer simulates immediate buffer writes.
 // If the buffer has storage, copies data to it.
 func (q *Queue) WriteBuffer(buffer hal.Buffer, offset uint64, data []byte) error {
-	switch b := buffer.(type) {
-	case *Buffer:
-		if b.data != nil {
-			copy(b.data[offset:], data)
-		}
-		return nil
-	case *Resource:
-		// Non-mapped buffer — no data to write, just a no-op.
-		_ = b
-		return nil
-	default:
-		return fmt.Errorf("noop: WriteBuffer: invalid buffer type %T", buffer)
+
+	// Convert float32 slice to JavaScript array
+	jsArray := js.Global().Get("ArrayBuffer").New(len(data))
+	for i, v := range data {
+		jsArray.SetIndex(i, v)
 	}
+
+	js.Global().Get("console").Call("log", "Writing to buffer:", buffer.(*Resource).value, "offset:", offset, "data:", jsArray)
+	q.queue.Call("writeBuffer", buffer.(*Resource).value, offset, jsArray)
+	return nil
 }
 
 // WriteTexture simulates immediate texture writes.

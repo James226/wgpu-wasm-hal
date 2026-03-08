@@ -12,16 +12,22 @@ import (
 
 // Device implements hal.Device for the noop backend.
 type Device struct {
-	value js.Value
+	device js.Value
 }
 
 // CreateBuffer creates a noop buffer.
 // Optionally stores data if MappedAtCreation is true.
 func (d *Device) CreateBuffer(desc *hal.BufferDescriptor) (hal.Buffer, error) {
-	if desc.MappedAtCreation {
-		return &Buffer{data: make([]byte, desc.Size)}, nil
-	}
-	return &Resource{}, nil
+	buffer := d.device.Call("createBuffer", js.ValueOf(map[string]interface{}{
+		"label":            desc.Label,
+		"size":             desc.Size,
+		"usage":            uint64(desc.Usage),
+		"mappedAtCreation": desc.MappedAtCreation,
+	}))
+
+	return &Resource{
+		value: buffer,
+	}, nil
 }
 
 // DestroyBuffer is a no-op.
@@ -76,7 +82,9 @@ func (d *Device) CreatePipelineLayout(_ *hal.PipelineLayoutDescriptor) (hal.Pipe
 func (d *Device) DestroyPipelineLayout(_ hal.PipelineLayout) {}
 
 // CreateShaderModule creates a noop shader module.
-func (d *Device) CreateShaderModule(_ *hal.ShaderModuleDescriptor) (hal.ShaderModule, error) {
+func (d *Device) CreateShaderModule(desc *hal.ShaderModuleDescriptor) (hal.ShaderModule, error) {
+
+	//d.device.Call("createShaderModule", desc.ToJS())
 	return &Resource{}, nil
 }
 
@@ -168,5 +176,5 @@ func (d *Device) WaitIdle() error { return nil }
 func (d *Device) Destroy() {}
 
 func (d *Device) ToJS() js.Value {
-	return d.value
+	return d.device
 }

@@ -42,7 +42,7 @@ func (a *Adapter) RequestDevice() <-chan DeviceResult {
 	promise := a.value.Call("requestDevice")
 
 	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		resultChan <- DeviceResult{Device: &Device{value: args[0]}}
+		resultChan <- DeviceResult{Device: &Device{device: args[0]}}
 		return nil
 	}))
 
@@ -62,13 +62,13 @@ func (a *Adapter) Open(_ gputypes.Features, _ gputypes.Limits) (hal.OpenDevice, 
 		return hal.OpenDevice{}, result.Error
 	}
 
-	device := <-result.Adapter.RequestDevice()
-	if device.Error != nil {
-		return hal.OpenDevice{}, device.Error
+	dr := <-result.Adapter.RequestDevice()
+	if dr.Error != nil {
+		return hal.OpenDevice{}, dr.Error
 	}
 	return hal.OpenDevice{
-		Device: device.Device,
-		Queue:  &Queue{},
+		Device: dr.Device,
+		Queue:  &Queue{queue: dr.Device.device.Get("queue")},
 	}, nil
 }
 
