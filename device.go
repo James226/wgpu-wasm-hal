@@ -4,13 +4,16 @@ package wasm
 
 import (
 	"fmt"
+	"syscall/js"
 	"time"
 
 	"github.com/gogpu/wgpu/hal"
 )
 
 // Device implements hal.Device for the noop backend.
-type Device struct{}
+type Device struct {
+	value js.Value
+}
 
 // CreateBuffer creates a noop buffer.
 // Optionally stores data if MappedAtCreation is true.
@@ -163,3 +166,7 @@ func (d *Device) WaitIdle() error { return nil }
 
 // Destroy is a no-op for the noop device.
 func (d *Device) Destroy() {}
+
+func (d *Device) ToJS() js.Value {
+	return d.value
+}

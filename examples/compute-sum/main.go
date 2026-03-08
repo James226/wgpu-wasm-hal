@@ -1,3 +1,5 @@
+//go:build js && wasm
+
 // Copyright 2025 The GoGPU Authors
 // SPDX-License-Identifier: MIT
 
@@ -13,12 +15,17 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"reflect"
+	"syscall/js"
+	"unsafe"
 
 	"github.com/gogpu/gputypes"
 	"github.com/gogpu/wgpu"
+	"github.com/gogpu/wgpu/core"
 
 	// Register all available GPU backends (Vulkan, DX12, GLES, Metal, etc.)
 	_ "github.com/james226/wgpu-wasm-hal"
+	wasm "github.com/james226/wgpu-wasm-hal"
 )
 
 // sumShaderWGSL performs pairwise addition: output[i] = input[2*i] + input[2*i+1].
@@ -115,6 +122,23 @@ func initDevice() (*wgpu.Device, func(), error) {
 		return nil, nil, fmt.Errorf("RequestDevice: %w", err)
 	}
 	fmt.Println("OK")
+
+	canvas := js.Global().Get("document").Call("getElementById", "canvas")
+
+	// Get WebGPU context from canvas
+	context := canvas.Call("getContext", "webgpu")
+
+	// Configure the context
+	format := js.Global().Get("navigator").Get("gpu").Call("getPreferredCanvasFormat")
+
+	deviceType := reflect.ValueOf(*device)
+	coreType := deviceType.FieldByName("core").Elem()
+	core := reflect.NewAt(coreType.Type(), unsafe.Pointer(coreType.UnsafeAddr())).Elem().Interface().(core.Device)
+	config := map[string]any{
+		"device": core.Raw(nil).(*wasm.Device).ToJS(),
+		"format": format,
+	}
+	context.Call("configure", config)
 
 	cleanup := func() {
 		device.Release()

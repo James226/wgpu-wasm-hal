@@ -22,16 +22,18 @@ func (API) Variant() gputypes.Backend {
 // CreateInstance creates a new noop instance.
 // Always succeeds and returns a placeholder instance.
 func (API) CreateInstance(_ *hal.InstanceDescriptor) (hal.Instance, error) {
-	gpu := js.Global().Get("navigator").Get("gpu")
+	global := js.Global()
+	gpu := global.Get("navigator").Get("gpu")
 	if gpu.IsUndefined() {
 		return nil, fmt.Errorf("WebGPU not supported")
 	}
-	return &Instance{gpu: gpu}, nil
+	return &Instance{gpu: gpu, global: global}, nil
 }
 
 // Instance implements hal.Instance for the noop backend.
 type Instance struct {
-	gpu js.Value
+	gpu    js.Value
+	global js.Value
 }
 
 // CreateSurface creates a noop surface.
@@ -40,12 +42,17 @@ func (i *Instance) CreateSurface(_, _ uintptr) (hal.Surface, error) {
 	return &Surface{}, nil
 }
 
+type AdapterResult struct {
+	Adapter *Adapter
+	Error   error
+}
+
 // EnumerateAdapters returns a single default noop adapter.
 // The surfaceHint is ignored.
 func (i *Instance) EnumerateAdapters(_ hal.Surface) []hal.ExposedAdapter {
 	return []hal.ExposedAdapter{
 		{
-			Adapter: &Adapter{},
+			Adapter: &Adapter{instance: i},
 			Info: gputypes.AdapterInfo{
 				Name:       "WASM Adapter",
 				Vendor:     "GoGPU",
@@ -53,7 +60,7 @@ func (i *Instance) EnumerateAdapters(_ hal.Surface) []hal.ExposedAdapter {
 				DeviceID:   0,
 				DeviceType: gputypes.DeviceTypeOther,
 				Driver:     "wasm-1.0",
-				DriverInfo: "No-operation backend for testing",
+				DriverInfo: "WASM WebGPU adapter",
 				Backend:    gputypes.BackendBrowserWebGPU,
 			},
 			Features: 0, // No features supported

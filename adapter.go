@@ -3,18 +3,71 @@
 package wasm
 
 import (
+	"syscall/js"
+
 	"github.com/gogpu/gputypes"
 	"github.com/gogpu/wgpu/hal"
 )
 
 // Adapter implements hal.Adapter for the noop backend.
-type Adapter struct{}
+type Adapter struct {
+	instance *Instance
+	value    js.Value
+}
+
+func (a *Adapter) RequestAdapter() <-chan AdapterResult {
+	resultChan := make(chan AdapterResult)
+	promise := a.instance.gpu.Call("requestAdapter")
+
+	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		resultChan <- AdapterResult{Adapter: &Adapter{value: args[0]}}
+		return nil
+	}))
+
+	promise.Call("catch", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		resultChan <- AdapterResult{Error: js.Error{Value: args[0]}}
+		return nil
+	}))
+
+	return resultChan
+}
+
+type DeviceResult struct {
+	Device *Device
+	Error  error
+}
+
+func (a *Adapter) RequestDevice() <-chan DeviceResult {
+	resultChan := make(chan DeviceResult)
+	promise := a.value.Call("requestDevice")
+
+	promise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		resultChan <- DeviceResult{Device: &Device{value: args[0]}}
+		return nil
+	}))
+
+	promise.Call("catch", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		resultChan <- DeviceResult{Error: js.Error{Value: args[0]}}
+		return nil
+	}))
+
+	return resultChan
+}
 
 // Open creates a noop device with the requested features and limits.
 // Always succeeds and returns a device/queue pair.
 func (a *Adapter) Open(_ gputypes.Features, _ gputypes.Limits) (hal.OpenDevice, error) {
+	result := <-a.RequestAdapter()
+	if result.Error != nil {
+		return hal.OpenDevice{}, result.Error
+	}
+
+	device := <-result.Adapter.RequestDevice()
+	if device.Error != nil {
+		return hal.OpenDevice{}, device.Error
+	}
 	return hal.OpenDevice{
-		Device: &Device{},
+		Device: device.Device,
 		Queue:  &Queue{},
 	}, nil
 }
