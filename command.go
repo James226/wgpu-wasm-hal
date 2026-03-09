@@ -3,12 +3,16 @@
 package wasm
 
 import (
+	"syscall/js"
+
 	"github.com/gogpu/gputypes"
 	"github.com/gogpu/wgpu/hal"
 )
 
 // CommandEncoder implements hal.CommandEncoder for the noop backend.
-type CommandEncoder struct{}
+type CommandEncoder struct {
+	value js.Value
+}
 
 // BeginEncoding is a no-op.
 func (c *CommandEncoder) BeginEncoding(_ string) error {
@@ -17,7 +21,8 @@ func (c *CommandEncoder) BeginEncoding(_ string) error {
 
 // EndEncoding returns a placeholder command buffer.
 func (c *CommandEncoder) EndEncoding() (hal.CommandBuffer, error) {
-	return &Resource{}, nil
+	r := c.value.Call("finish")
+	return &Resource{value: r}, nil
 }
 
 // DiscardEncoding is a no-op.
@@ -36,7 +41,9 @@ func (c *CommandEncoder) TransitionTextures(_ []hal.TextureBarrier) {}
 func (c *CommandEncoder) ClearBuffer(_ hal.Buffer, _, _ uint64) {}
 
 // CopyBufferToBuffer is a no-op.
-func (c *CommandEncoder) CopyBufferToBuffer(_, _ hal.Buffer, _ []hal.BufferCopy) {}
+func (c *CommandEncoder) CopyBufferToBuffer(source, destination hal.Buffer, params []hal.BufferCopy) {
+	c.value.Call("copyBufferToBuffer", source.(*Resource).value, destination.(*Resource).value, params[0].Size)
+}
 
 // CopyBufferToTexture is a no-op.
 func (c *CommandEncoder) CopyBufferToTexture(_ hal.Buffer, _ hal.Texture, _ []hal.BufferTextureCopy) {
@@ -59,14 +66,16 @@ func (c *CommandEncoder) BeginRenderPass(_ *hal.RenderPassDescriptor) hal.Render
 
 // BeginComputePass returns a noop compute pass encoder.
 func (c *CommandEncoder) BeginComputePass(_ *hal.ComputePassDescriptor) hal.ComputePassEncoder {
-	return &ComputePassEncoder{}
+	p := c.value.Call("beginComputePass")
+	return &ComputePassEncoder{value: p}
 }
 
 // RenderPassEncoder implements hal.RenderPassEncoder for the noop backend.
 type RenderPassEncoder struct{}
 
 // End is a no-op.
-func (r *RenderPassEncoder) End() {}
+func (r *RenderPassEncoder) End() {
+}
 
 // SetPipeline is a no-op.
 func (r *RenderPassEncoder) SetPipeline(_ hal.RenderPipeline) {}
@@ -108,19 +117,29 @@ func (r *RenderPassEncoder) DrawIndexedIndirect(_ hal.Buffer, _ uint64) {}
 func (r *RenderPassEncoder) ExecuteBundle(_ hal.RenderBundle) {}
 
 // ComputePassEncoder implements hal.ComputePassEncoder for the noop backend.
-type ComputePassEncoder struct{}
+type ComputePassEncoder struct {
+	value js.Value
+}
 
 // End is a no-op.
-func (c *ComputePassEncoder) End() {}
+func (c *ComputePassEncoder) End() {
+	c.value.Call("end")
+}
 
 // SetPipeline is a no-op.
-func (c *ComputePassEncoder) SetPipeline(_ hal.ComputePipeline) {}
+func (c *ComputePassEncoder) SetPipeline(pipeline hal.ComputePipeline) {
+	c.value.Call("setPipeline", pipeline.(*Resource).value)
+}
 
 // SetBindGroup is a no-op.
-func (c *ComputePassEncoder) SetBindGroup(_ uint32, _ hal.BindGroup, _ []uint32) {}
+func (c *ComputePassEncoder) SetBindGroup(idx uint32, bindGroup hal.BindGroup, _ []uint32) {
+	c.value.Call("setBindGroup", idx, bindGroup.(*Resource).value)
+}
 
 // Dispatch is a no-op.
-func (c *ComputePassEncoder) Dispatch(_, _, _ uint32) {}
+func (c *ComputePassEncoder) Dispatch(x, y, z uint32) {
+	c.value.Call("dispatchWorkgroups", x, y, z)
+}
 
 // DispatchIndirect is a no-op.
 func (c *ComputePassEncoder) DispatchIndirect(_ hal.Buffer, _ uint64) {}

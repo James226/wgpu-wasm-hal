@@ -22,18 +22,16 @@ func (API) Variant() gputypes.Backend {
 // CreateInstance creates a new noop instance.
 // Always succeeds and returns a placeholder instance.
 func (API) CreateInstance(_ *hal.InstanceDescriptor) (hal.Instance, error) {
-	global := js.Global()
-	gpu := global.Get("navigator").Get("gpu")
+	gpu := js.Global().Get("navigator").Get("gpu")
 	if gpu.IsUndefined() {
 		return nil, fmt.Errorf("WebGPU not supported")
 	}
-	return &Instance{gpu: gpu, global: global}, nil
+	return &Instance{gpu: gpu}, nil
 }
 
 // Instance implements hal.Instance for the noop backend.
 type Instance struct {
-	gpu    js.Value
-	global js.Value
+	gpu js.Value
 }
 
 // CreateSurface creates a noop surface.

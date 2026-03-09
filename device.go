@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"syscall/js"
 	"time"
+	"unsafe"
 
+	"github.com/gogpu/gputypes"
 	"github.com/gogpu/wgpu/hal"
 )
 
@@ -57,25 +59,115 @@ func (d *Device) CreateSampler(_ *hal.SamplerDescriptor) (hal.Sampler, error) {
 // DestroySampler is a no-op.
 func (d *Device) DestroySampler(_ hal.Sampler) {}
 
-// CreateBindGroupLayout creates a noop bind group layout.
-func (d *Device) CreateBindGroupLayout(_ *hal.BindGroupLayoutDescriptor) (hal.BindGroupLayout, error) {
-	return &Resource{}, nil
+func BufferBindingTypeToJs(t gputypes.BufferBindingType) string {
+	switch t {
+	case gputypes.BufferBindingTypeUndefined:
+		return "undefined"
+	case gputypes.BufferBindingTypeUniform:
+		return "uniform"
+	case gputypes.BufferBindingTypeStorage:
+		return "storage"
+	case gputypes.BufferBindingTypeReadOnlyStorage:
+		return "read-only-storage"
+	default:
+		return "unknown"
+	}
+}
+
+func SamplerBindingTypeToJs(t gputypes.SamplerBindingType) string {
+	switch t {
+	case gputypes.SamplerBindingTypeUndefined:
+		return "undefined"
+	case gputypes.SamplerBindingTypeFiltering:
+		return "filtering"
+	case gputypes.SamplerBindingTypeNonFiltering:
+		return "non-filtering"
+	case gputypes.SamplerBindingTypeComparison:
+		return "comparison"
+	default:
+		return "unknown"
+	}
+}
+
+func (d *Device) CreateBindGroupLayout(desc *hal.BindGroupLayoutDescriptor) (hal.BindGroupLayout, error) {
+	descriptor := map[string]any{
+		"label": desc.Label,
+		"entries": func() []any {
+			entries := make([]any, len(desc.Entries))
+			for i, entry := range desc.Entries {
+				e := make(map[string]any)
+				e["binding"] = entry.Binding
+				e["visibility"] = uint32(entry.Visibility)
+				if entry.Buffer != nil {
+					e["buffer"] = map[string]any{
+						"type": BufferBindingTypeToJs(entry.Buffer.Type),
+					}
+				}
+				if entry.Sampler != nil {
+					e["sampler"] = map[string]any{
+						"type": SamplerBindingTypeToJs(entry.Sampler.Type),
+					}
+				}
+				entries[i] = e
+			}
+			return entries
+		}(),
+	}
+
+	bgl := d.device.Call("createBindGroupLayout", descriptor)
+	return &Resource{value: bgl}, nil
 }
 
 // DestroyBindGroupLayout is a no-op.
 func (d *Device) DestroyBindGroupLayout(_ hal.BindGroupLayout) {}
 
 // CreateBindGroup creates a noop bind group.
-func (d *Device) CreateBindGroup(_ *hal.BindGroupDescriptor) (hal.BindGroup, error) {
-	return &Resource{}, nil
+func (d *Device) CreateBindGroup(desc *hal.BindGroupDescriptor) (hal.BindGroup, error) {
+	descriptor := map[string]any{
+		"label":  desc.Label,
+		"layout": desc.Layout.(*Resource).value,
+		"entries": func() []any {
+			entries := make([]any, len(desc.Entries))
+			for i, entry := range desc.Entries {
+				entries[i] = map[string]any{
+					"binding": entry.Binding,
+					"resource": func() any {
+						switch r := entry.Resource.(type) {
+						case gputypes.BufferBinding:
+							return map[string]any{
+								"buffer": *(*js.Value)(unsafe.Pointer(r.Buffer)),
+							}
+						}
+						return nil
+					}(),
+				}
+			}
+			return entries
+		}(),
+	}
+
+	bg := d.device.Call("createBindGroup", descriptor)
+	return &Resource{value: bg}, nil
 }
 
 // DestroyBindGroup is a no-op.
 func (d *Device) DestroyBindGroup(_ hal.BindGroup) {}
 
 // CreatePipelineLayout creates a noop pipeline layout.
-func (d *Device) CreatePipelineLayout(_ *hal.PipelineLayoutDescriptor) (hal.PipelineLayout, error) {
-	return &Resource{}, nil
+func (d *Device) CreatePipelineLayout(desc *hal.PipelineLayoutDescriptor) (hal.PipelineLayout, error) {
+	descriptor := map[string]any{
+		"label": desc.Label,
+		"bindGroupLayouts": func() []any {
+			layouts := make([]any, len(desc.BindGroupLayouts))
+			for i, layout := range desc.BindGroupLayouts {
+				layouts[i] = layout.(*Resource).value
+			}
+			return layouts
+		}(),
+	}
+
+	pl := d.device.Call("createPipelineLayout", descriptor)
+	return &Resource{value: pl}, nil
 }
 
 // DestroyPipelineLayout is a no-op.
@@ -83,9 +175,12 @@ func (d *Device) DestroyPipelineLayout(_ hal.PipelineLayout) {}
 
 // CreateShaderModule creates a noop shader module.
 func (d *Device) CreateShaderModule(desc *hal.ShaderModuleDescriptor) (hal.ShaderModule, error) {
-
-	//d.device.Call("createShaderModule", desc.ToJS())
-	return &Resource{}, nil
+	descriptor := map[string]any{
+		"label": desc.Label,
+		"code":  desc.Source.WGSL,
+	}
+	shaderModule := d.device.Call("createShaderModule", descriptor)
+	return &Resource{value: shaderModule}, nil
 }
 
 // DestroyShaderModule is a no-op.
@@ -100,8 +195,17 @@ func (d *Device) CreateRenderPipeline(_ *hal.RenderPipelineDescriptor) (hal.Rend
 func (d *Device) DestroyRenderPipeline(_ hal.RenderPipeline) {}
 
 // CreateComputePipeline creates a noop compute pipeline.
-func (d *Device) CreateComputePipeline(_ *hal.ComputePipelineDescriptor) (hal.ComputePipeline, error) {
-	return &Resource{}, nil
+func (d *Device) CreateComputePipeline(desc *hal.ComputePipelineDescriptor) (hal.ComputePipeline, error) {
+	descriptor := map[string]any{
+		"label":  desc.Label,
+		"layout": desc.Layout.(*Resource).value,
+		"compute": map[string]any{
+			"module":     desc.Compute.Module.(*Resource).value,
+			"entryPoint": desc.Compute.EntryPoint,
+		},
+	}
+	cp := d.device.Call("createComputePipeline", descriptor)
+	return &Resource{value: cp}, nil
 }
 
 // DestroyComputePipeline is a no-op.
@@ -116,8 +220,13 @@ func (d *Device) CreateQuerySet(_ *hal.QuerySetDescriptor) (hal.QuerySet, error)
 func (d *Device) DestroyQuerySet(_ hal.QuerySet) {}
 
 // CreateCommandEncoder creates a noop command encoder.
-func (d *Device) CreateCommandEncoder(_ *hal.CommandEncoderDescriptor) (hal.CommandEncoder, error) {
-	return &CommandEncoder{}, nil
+func (d *Device) CreateCommandEncoder(desc *hal.CommandEncoderDescriptor) (hal.CommandEncoder, error) {
+	descriptor := map[string]any{
+		"label": desc.Label,
+	}
+	cp := d.device.Call("createCommandEncoder", descriptor)
+
+	return &CommandEncoder{value: cp}, nil
 }
 
 // CreateFence creates a noop fence with atomic counter.

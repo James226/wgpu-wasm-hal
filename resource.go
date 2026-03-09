@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"syscall/js"
 	"time"
+	"unsafe"
 
 	"github.com/gogpu/wgpu/hal"
 )
@@ -20,7 +21,7 @@ type Resource struct {
 func (r *Resource) Destroy() {}
 
 // NativeHandle returns 0 for noop resources (no real handle).
-func (r *Resource) NativeHandle() uintptr { return 0 }
+func (r *Resource) NativeHandle() uintptr { return uintptr(unsafe.Pointer(&r.value)) }
 
 // Buffer implements hal.Buffer with optional data storage.
 // If created with MappedAtCreation, it stores the buffer data.

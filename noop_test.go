@@ -1,3 +1,5 @@
+//go:build js && wasm
+
 package wasm_test
 
 import (
@@ -8,13 +10,13 @@ import (
 
 	"github.com/gogpu/gputypes"
 	"github.com/gogpu/wgpu/hal"
-	"github.com/gogpu/wgpu/hal/wasm"
+	wasm "github.com/james226/wgpu-wasm-hal"
 )
 
 // TestNoopBackendVariant tests the backend variant identification.
 func TestNoopBackendVariant(t *testing.T) {
 	api := wasm.API{}
-	if api.Variant() != gputypes.BackendEmpty {
+	if api.Variant() != gputypes.BackendBrowserWebGPU {
 		t.Errorf("expected BackendEmpty, got %v", api.Variant())
 	}
 }
