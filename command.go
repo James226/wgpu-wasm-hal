@@ -3,6 +3,7 @@
 package wasm
 
 import (
+	"strings"
 	"syscall/js"
 
 	"github.com/gogpu/gputypes"
@@ -60,8 +61,33 @@ func (c *CommandEncoder) CopyTextureToTexture(_, _ hal.Texture, _ []hal.TextureC
 func (c *CommandEncoder) ResolveQuerySet(_ hal.QuerySet, _, _ uint32, _ hal.Buffer, _ uint64) {}
 
 // BeginRenderPass returns a noop render pass encoder.
-func (c *CommandEncoder) BeginRenderPass(_ *hal.RenderPassDescriptor) hal.RenderPassEncoder {
-	return &RenderPassEncoder{}
+func (c *CommandEncoder) BeginRenderPass(desc *hal.RenderPassDescriptor) hal.RenderPassEncoder {
+	descriptor := make(map[string]any)
+	descriptor["colorAttachments"] = func() []any {
+		attachments := make([]any, len(desc.ColorAttachments))
+		for i, a := range desc.ColorAttachments {
+			attachments[i] = map[string]any{
+				"view":       a.View.(*Resource).value,
+				"loadOp":     strings.ToLower(a.LoadOp.String()),
+				"storeOp":    strings.ToLower(a.StoreOp.String()),
+				"clearValue": map[string]any{"r": a.ClearValue.R, "g": a.ClearValue.G, "b": a.ClearValue.B, "a": a.ClearValue.A},
+			}
+		}
+		return attachments
+	}()
+	if desc.DepthStencilAttachment != nil {
+		descriptor["depthStencilAttachment"] = map[string]any{
+			"view":              desc.DepthStencilAttachment.View.(*Resource).value,
+			"depthLoadOp":       strings.ToLower(desc.DepthStencilAttachment.DepthLoadOp.String()),
+			"depthStoreOp":      strings.ToLower(desc.DepthStencilAttachment.DepthStoreOp.String()),
+			"depthClearValue":   desc.DepthStencilAttachment.DepthClearValue,
+			"stencilLoadOp":     strings.ToLower(desc.DepthStencilAttachment.StencilLoadOp.String()),
+			"stencilStoreOp":    strings.ToLower(desc.DepthStencilAttachment.StencilStoreOp.String()),
+			"stencilClearValue": desc.DepthStencilAttachment.StencilClearValue,
+		}
+	}
+	pass := c.value.Call("beginRenderPass", descriptor)
+	return &RenderPassEncoder{value: pass}
 }
 
 // BeginComputePass returns a noop compute pass encoder.
@@ -71,20 +97,27 @@ func (c *CommandEncoder) BeginComputePass(_ *hal.ComputePassDescriptor) hal.Comp
 }
 
 // RenderPassEncoder implements hal.RenderPassEncoder for the noop backend.
-type RenderPassEncoder struct{}
+type RenderPassEncoder struct {
+	value js.Value
+}
 
 // End is a no-op.
 func (r *RenderPassEncoder) End() {
+	r.value.Call("end")
 }
 
 // SetPipeline is a no-op.
-func (r *RenderPassEncoder) SetPipeline(_ hal.RenderPipeline) {}
+func (c *RenderPassEncoder) SetPipeline(pipeline hal.RenderPipeline) {
+	c.value.Call("setPipeline", pipeline.(*Resource).value)
+}
 
 // SetBindGroup is a no-op.
 func (r *RenderPassEncoder) SetBindGroup(_ uint32, _ hal.BindGroup, _ []uint32) {}
 
 // SetVertexBuffer is a no-op.
-func (r *RenderPassEncoder) SetVertexBuffer(_ uint32, _ hal.Buffer, _ uint64) {}
+func (r *RenderPassEncoder) SetVertexBuffer(slot uint32, buffer hal.Buffer, offset uint64) {
+	r.value.Call("setVertexBuffer", slot, buffer.(*Resource).value, offset)
+}
 
 // SetIndexBuffer is a no-op.
 func (r *RenderPassEncoder) SetIndexBuffer(_ hal.Buffer, _ gputypes.IndexFormat, _ uint64) {}
@@ -102,7 +135,9 @@ func (r *RenderPassEncoder) SetBlendConstant(_ *gputypes.Color) {}
 func (r *RenderPassEncoder) SetStencilReference(_ uint32) {}
 
 // Draw is a no-op.
-func (r *RenderPassEncoder) Draw(_, _, _, _ uint32) {}
+func (r *RenderPassEncoder) Draw(vertexCount, instanceCount, firstVertex, firstInstance uint32) {
+	r.value.Call("draw", vertexCount, instanceCount, firstVertex, firstInstance)
+}
 
 // DrawIndexed is a no-op.
 func (r *RenderPassEncoder) DrawIndexed(_, _, _ uint32, _ int32, _ uint32) {}

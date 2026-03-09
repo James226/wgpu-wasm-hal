@@ -4,6 +4,7 @@ package wasm
 
 import (
 	"fmt"
+	"strings"
 	"syscall/js"
 	"time"
 	"unsafe"
@@ -20,12 +21,12 @@ type Device struct {
 // CreateBuffer creates a noop buffer.
 // Optionally stores data if MappedAtCreation is true.
 func (d *Device) CreateBuffer(desc *hal.BufferDescriptor) (hal.Buffer, error) {
-	buffer := d.device.Call("createBuffer", js.ValueOf(map[string]interface{}{
+	buffer := d.device.Call("createBuffer", map[string]any{
 		"label":            desc.Label,
 		"size":             desc.Size,
 		"usage":            uint64(desc.Usage),
 		"mappedAtCreation": desc.MappedAtCreation,
-	}))
+	})
 
 	return &Resource{
 		value: buffer,
@@ -44,8 +45,9 @@ func (d *Device) CreateTexture(_ *hal.TextureDescriptor) (hal.Texture, error) {
 func (d *Device) DestroyTexture(_ hal.Texture) {}
 
 // CreateTextureView creates a noop texture view.
-func (d *Device) CreateTextureView(_ hal.Texture, _ *hal.TextureViewDescriptor) (hal.TextureView, error) {
-	return &Resource{}, nil
+func (d *Device) CreateTextureView(texture hal.Texture, _ *hal.TextureViewDescriptor) (hal.TextureView, error) {
+	v := texture.(*SurfaceTexture).value.Call("createView")
+	return &Resource{value: v}, nil
 }
 
 // DestroyTextureView is a no-op.
@@ -186,9 +188,99 @@ func (d *Device) CreateShaderModule(desc *hal.ShaderModuleDescriptor) (hal.Shade
 // DestroyShaderModule is a no-op.
 func (d *Device) DestroyShaderModule(_ hal.ShaderModule) {}
 
+func VertexStepModeToJs(m gputypes.VertexStepMode) string {
+	switch m {
+	case gputypes.VertexStepModeUndefined:
+		return "undefined"
+	case gputypes.VertexStepModeVertexBufferNotUsed:
+		return "vertex-buffer-not-used"
+	case gputypes.VertexStepModeVertex:
+		return "vertex"
+	case gputypes.VertexStepModeInstance:
+		return "instance"
+	default:
+		return "unknown"
+	}
+}
+
+func PrimitiveTopologyToJs(t gputypes.PrimitiveTopology) string {
+	switch t {
+	case gputypes.PrimitiveTopologyUndefined:
+		return "undefined"
+	case gputypes.PrimitiveTopologyPointList:
+		return "point-list"
+	case gputypes.PrimitiveTopologyLineList:
+		return "line-list"
+	case gputypes.PrimitiveTopologyLineStrip:
+		return "line-strip"
+	case gputypes.PrimitiveTopologyTriangleList:
+		return "triangle-list"
+	case gputypes.PrimitiveTopologyTriangleStrip:
+		return "triangle-strip"
+	default:
+		return "unknown"
+	}
+}
+
 // CreateRenderPipeline creates a noop render pipeline.
-func (d *Device) CreateRenderPipeline(_ *hal.RenderPipelineDescriptor) (hal.RenderPipeline, error) {
-	return &Resource{}, nil
+func (d *Device) CreateRenderPipeline(desc *hal.RenderPipelineDescriptor) (hal.RenderPipeline, error) {
+	descriptor := map[string]any{
+		"label": desc.Label,
+		"layout": func() any {
+			if desc.Layout != nil {
+				return desc.Layout.(*Resource).value
+			}
+			return "auto"
+		}(),
+		"vertex": map[string]any{
+			"module":     desc.Vertex.Module.(*Resource).value,
+			"entryPoint": desc.Vertex.EntryPoint,
+			"buffers": func() []any {
+				buffers := make([]any, len(desc.Vertex.Buffers))
+				for i, vb := range desc.Vertex.Buffers {
+					buffers[i] = map[string]any{
+						"arrayStride": vb.ArrayStride,
+						"stepMode":    VertexStepModeToJs(vb.StepMode),
+						"attributes": func() []any {
+							attributes := make([]any, len(vb.Attributes))
+							for j, attr := range vb.Attributes {
+								attributes[j] = map[string]any{
+									"shaderLocation": attr.ShaderLocation,
+									"format":         strings.ToLower(attr.Format.String()),
+									"offset":         attr.Offset,
+								}
+							}
+							return attributes
+						}(),
+					}
+				}
+				return buffers
+			}(),
+		},
+		"fragment": func() any {
+			if desc.Fragment != nil {
+				return map[string]any{
+					"module":     desc.Fragment.Module.(*Resource).value,
+					"entryPoint": desc.Fragment.EntryPoint,
+					"targets": func() []any {
+						targets := make([]any, len(desc.Fragment.Targets))
+						for i, target := range desc.Fragment.Targets {
+							targets[i] = map[string]any{
+								"format": strings.ToLower(target.Format.String()),
+							}
+						}
+						return targets
+					}(),
+				}
+			}
+			return nil
+		}(),
+		"primitive": map[string]any{
+			"topology": PrimitiveTopologyToJs(desc.Primitive.Topology),
+		},
+	}
+	rp := d.device.Call("createRenderPipeline", descriptor)
+	return &Resource{value: rp}, nil
 }
 
 // DestroyRenderPipeline is a no-op.

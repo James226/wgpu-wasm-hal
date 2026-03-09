@@ -6,6 +6,7 @@ package wasm
 import (
 	"fmt"
 	"syscall/js"
+	"unsafe"
 
 	"github.com/gogpu/gputypes"
 	"github.com/gogpu/wgpu/hal"
@@ -36,8 +37,11 @@ type Instance struct {
 
 // CreateSurface creates a noop surface.
 // Always succeeds regardless of display/window handles.
-func (i *Instance) CreateSurface(_, _ uintptr) (hal.Surface, error) {
-	return &Surface{}, nil
+func (i *Instance) CreateSurface(displayHandle, _ uintptr) (hal.Surface, error) {
+	canvas := *(*js.Value)(unsafe.Pointer(displayHandle))
+	context := canvas.Call("getContext", "webgpu")
+
+	return &Surface{canvas: canvas, context: context}, nil
 }
 
 type AdapterResult struct {

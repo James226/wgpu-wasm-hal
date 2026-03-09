@@ -44,12 +44,22 @@ func (t *Texture) NativeHandle() uintptr { return 0 }
 // Surface implements hal.Surface for the noop backend.
 type Surface struct {
 	Resource
+	canvas     js.Value
+	context    js.Value
 	configured bool
 }
 
 // Configure marks the surface as configured.
-func (s *Surface) Configure(_ hal.Device, _ *hal.SurfaceConfiguration) error {
+func (s *Surface) Configure(device hal.Device, _ *hal.SurfaceConfiguration) error {
 	s.configured = true
+
+	format := js.Global().Get("navigator").Get("gpu").Call("getPreferredCanvasFormat")
+	config := map[string]any{
+		"device":    device.(*Device).device,
+		"format":    format,
+		"alphaMode": "premultiplied",
+	}
+	s.context.Call("configure", config)
 	return nil
 }
 
@@ -61,8 +71,9 @@ func (s *Surface) Unconfigure(_ hal.Device) {
 // AcquireTexture returns a placeholder surface texture.
 // The fence parameter is ignored.
 func (s *Surface) AcquireTexture(_ hal.Fence) (*hal.AcquiredSurfaceTexture, error) {
+	texture := s.context.Call("getCurrentTexture")
 	return &hal.AcquiredSurfaceTexture{
-		Texture:    &SurfaceTexture{},
+		Texture:    &SurfaceTexture{Texture: Texture{Resource: Resource{value: texture}}},
 		Suboptimal: false,
 	}, nil
 }

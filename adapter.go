@@ -1,4 +1,4 @@
-//go:build js && wasm
+//go:build (wasip1 || js) && wasm
 
 package wasm
 

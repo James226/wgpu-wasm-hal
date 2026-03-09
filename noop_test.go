@@ -5,6 +5,7 @@ package wasm_test
 import (
 	"errors"
 	"sync"
+	"syscall/js"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ func TestNoopBackendVariant(t *testing.T) {
 
 // TestNoopCreateInstance tests instance creation.
 func TestNoopCreateInstance(t *testing.T) {
+	js.Global().Get("navigator").Set("gpu", js.ValueOf(map[string]interface{}{}))
 	api := wasm.API{}
 	desc := &hal.InstanceDescriptor{
 		Backends: gputypes.BackendsPrimary,
@@ -73,11 +75,11 @@ func TestNoopEnumerateAdapters(t *testing.T) {
 	if adapter.Adapter == nil {
 		t.Error("expected non-nil adapter")
 	}
-	if adapter.Info.Name != "Noop Adapter" {
-		t.Errorf("expected adapter name 'Noop Adapter', got %q", adapter.Info.Name)
+	if adapter.Info.Name != "WASM Adapter" {
+		t.Errorf("expected adapter name 'WASM Adapter', got %q", adapter.Info.Name)
 	}
-	if adapter.Info.Backend != gputypes.BackendEmpty {
-		t.Errorf("expected backend BackendEmpty, got %v", adapter.Info.Backend)
+	if adapter.Info.Backend != gputypes.BackendBrowserWebGPU {
+		t.Errorf("expected backend BackendBrowserWebGPU, got %v", adapter.Info.Backend)
 	}
 	if adapter.Info.DeviceType != gputypes.DeviceTypeOther {
 		t.Errorf("expected device type Other, got %v", adapter.Info.DeviceType)
