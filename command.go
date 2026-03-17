@@ -39,7 +39,9 @@ func (c *CommandEncoder) TransitionBuffers(_ []hal.BufferBarrier) {}
 func (c *CommandEncoder) TransitionTextures(_ []hal.TextureBarrier) {}
 
 // ClearBuffer is a no-op.
-func (c *CommandEncoder) ClearBuffer(_ hal.Buffer, _, _ uint64) {}
+func (c *CommandEncoder) ClearBuffer(buffer hal.Buffer, offset, size uint64) {
+	c.value.Call("clearBuffer", buffer.(*Resource).value, offset, size)
+}
 
 // CopyBufferToBuffer is a no-op.
 func (c *CommandEncoder) CopyBufferToBuffer(source, destination hal.Buffer, params []hal.BufferCopy) {
@@ -120,19 +122,29 @@ func (r *RenderPassEncoder) SetVertexBuffer(slot uint32, buffer hal.Buffer, offs
 }
 
 // SetIndexBuffer is a no-op.
-func (r *RenderPassEncoder) SetIndexBuffer(_ hal.Buffer, _ gputypes.IndexFormat, _ uint64) {}
+func (r *RenderPassEncoder) SetIndexBuffer(buffer hal.Buffer, format gputypes.IndexFormat, offset uint64) {
+	r.value.Call("setIndexBuffer", buffer.(*Resource).value, strings.ToLower(format.String()), offset)
+}
 
 // SetViewport is a no-op.
-func (r *RenderPassEncoder) SetViewport(_, _, _, _, _, _ float32) {}
+func (r *RenderPassEncoder) SetViewport(x, y, width, height, minDepth, maxDepth float32) {
+	r.value.Call("setViewport", x, y, width, height, minDepth, maxDepth)
+}
 
 // SetScissorRect is a no-op.
-func (r *RenderPassEncoder) SetScissorRect(_, _, _, _ uint32) {}
+func (r *RenderPassEncoder) SetScissorRect(x, y, width, height uint32) {
+	r.value.Call("setScissorRect", x, y, width, height)
+}
 
 // SetBlendConstant is a no-op.
-func (r *RenderPassEncoder) SetBlendConstant(_ *gputypes.Color) {}
+func (r *RenderPassEncoder) SetBlendConstant(color *gputypes.Color) {
+	r.value.Call("setBlendConstant", []any{color.R, color.G, color.B, color.A})
+}
 
 // SetStencilReference is a no-op.
-func (r *RenderPassEncoder) SetStencilReference(_ uint32) {}
+func (r *RenderPassEncoder) SetStencilReference(reference uint32) {
+	r.value.Call("setStencilReference", reference)
+}
 
 // Draw is a no-op.
 func (r *RenderPassEncoder) Draw(vertexCount, instanceCount, firstVertex, firstInstance uint32) {
@@ -140,13 +152,19 @@ func (r *RenderPassEncoder) Draw(vertexCount, instanceCount, firstVertex, firstI
 }
 
 // DrawIndexed is a no-op.
-func (r *RenderPassEncoder) DrawIndexed(_, _, _ uint32, _ int32, _ uint32) {}
+func (r *RenderPassEncoder) DrawIndexed(indexCount, instanceCount, firstIndex uint32, baseVertex int32, firstInstance uint32) {
+	r.value.Call("drawIndexed", indexCount, instanceCount, firstIndex, baseVertex, firstInstance)
+}
 
 // DrawIndirect is a no-op.
-func (r *RenderPassEncoder) DrawIndirect(_ hal.Buffer, _ uint64) {}
+func (r *RenderPassEncoder) DrawIndirect(buffer hal.Buffer, offset uint64) {
+	r.value.Call("drawIndirect", buffer.(*Resource).value, offset)
+}
 
 // DrawIndexedIndirect is a no-op.
-func (r *RenderPassEncoder) DrawIndexedIndirect(_ hal.Buffer, _ uint64) {}
+func (r *RenderPassEncoder) DrawIndexedIndirect(buffer hal.Buffer, offset uint64) {
+	r.value.Call("drawIndexedIndirect", buffer.(*Resource).value, offset)
+}
 
 // ExecuteBundle is a no-op.
 func (r *RenderPassEncoder) ExecuteBundle(_ hal.RenderBundle) {}
@@ -177,4 +195,6 @@ func (c *ComputePassEncoder) Dispatch(x, y, z uint32) {
 }
 
 // DispatchIndirect is a no-op.
-func (c *ComputePassEncoder) DispatchIndirect(_ hal.Buffer, _ uint64) {}
+func (c *ComputePassEncoder) DispatchIndirect(buffer hal.Buffer, offset uint64) {
+	c.value.Call("dispatchWorkgroupsIndirect", buffer.(*Resource).value, offset)
+}

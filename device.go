@@ -34,7 +34,9 @@ func (d *Device) CreateBuffer(desc *hal.BufferDescriptor) (hal.Buffer, error) {
 }
 
 // DestroyBuffer is a no-op.
-func (d *Device) DestroyBuffer(_ hal.Buffer) {}
+func (d *Device) DestroyBuffer(buffer hal.Buffer) {
+	buffer.(*Resource).value.Call("destroy")
+}
 
 // CreateTexture creates a noop texture.
 func (d *Device) CreateTexture(_ *hal.TextureDescriptor) (hal.Texture, error) {
@@ -42,7 +44,9 @@ func (d *Device) CreateTexture(_ *hal.TextureDescriptor) (hal.Texture, error) {
 }
 
 // DestroyTexture is a no-op.
-func (d *Device) DestroyTexture(_ hal.Texture) {}
+func (d *Device) DestroyTexture(texture hal.Texture) {
+	texture.(*Texture).value.Call("destroy")
+}
 
 // CreateTextureView creates a noop texture view.
 func (d *Device) CreateTextureView(texture hal.Texture, _ *hal.TextureViewDescriptor) (hal.TextureView, error) {
@@ -51,7 +55,9 @@ func (d *Device) CreateTextureView(texture hal.Texture, _ *hal.TextureViewDescri
 }
 
 // DestroyTextureView is a no-op.
-func (d *Device) DestroyTextureView(_ hal.TextureView) {}
+func (d *Device) DestroyTextureView(texture hal.TextureView) {
+	texture.(*Resource).value.Call("destroy")
+}
 
 // CreateSampler creates a noop sampler.
 func (d *Device) CreateSampler(_ *hal.SamplerDescriptor) (hal.Sampler, error) {
@@ -373,8 +379,9 @@ func (d *Device) DestroyRenderBundle(bundle hal.RenderBundle) {}
 // WaitIdle is a no-op for the noop device.
 func (d *Device) WaitIdle() error { return nil }
 
-// Destroy is a no-op for the noop device.
-func (d *Device) Destroy() {}
+func (d *Device) Destroy() {
+	d.device.Call("destroy")
+}
 
 func (d *Device) ToJS() js.Value {
 	return d.device
