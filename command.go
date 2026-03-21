@@ -109,12 +109,14 @@ func (r *RenderPassEncoder) End() {
 }
 
 // SetPipeline is a no-op.
-func (c *RenderPassEncoder) SetPipeline(pipeline hal.RenderPipeline) {
-	c.value.Call("setPipeline", pipeline.(*Resource).value)
+func (r *RenderPassEncoder) SetPipeline(pipeline hal.RenderPipeline) {
+	r.value.Call("setPipeline", pipeline.(*Resource).value)
 }
 
 // SetBindGroup is a no-op.
-func (r *RenderPassEncoder) SetBindGroup(_ uint32, _ hal.BindGroup, _ []uint32) {}
+func (r *RenderPassEncoder) SetBindGroup(idx uint32, bindGroup hal.BindGroup, _ []uint32) {
+	r.value.Call("setBindGroup", idx, bindGroup.(*Resource).value)
+}
 
 // SetVertexBuffer is a no-op.
 func (r *RenderPassEncoder) SetVertexBuffer(slot uint32, buffer hal.Buffer, offset uint64) {
