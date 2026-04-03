@@ -50,7 +50,11 @@ func (d *Device) DestroyTexture(texture hal.Texture) {
 
 // CreateTextureView creates a noop texture view.
 func (d *Device) CreateTextureView(texture hal.Texture, _ *hal.TextureViewDescriptor) (hal.TextureView, error) {
-	v := texture.(*SurfaceTexture).value.Call("createView")
+	surface, ok := texture.(*SurfaceTexture)
+	if ok {
+		return &Resource{value: surface.Texture.value.Call("createView")}, nil
+	}
+	v := texture.(*Texture).value.Call("createView")
 	return &Resource{value: v}, nil
 }
 
