@@ -39,8 +39,17 @@ func (d *Device) DestroyBuffer(buffer hal.Buffer) {
 }
 
 // CreateTexture creates a noop texture.
-func (d *Device) CreateTexture(_ *hal.TextureDescriptor) (hal.Texture, error) {
-	return &Texture{}, nil
+func (d *Device) CreateTexture(desc *hal.TextureDescriptor) (hal.Texture, error) {
+	texture := d.device.Call("createTexture", map[string]any{
+		"label": desc.Label,
+		"size": map[string]any{
+			"width":  desc.Size.Width,
+			"height": desc.Size.Height,
+		},
+		"format": strings.Replace(strings.ToLower(desc.Format.String()), "stencil8", "-stencil8", -1),
+		"usage":  uint64(desc.Usage),
+	})
+	return &Texture{Resource: Resource{value: texture}}, nil
 }
 
 // DestroyTexture is a no-op.
